@@ -31,7 +31,7 @@ In order to display status info in the bar, you can do something like this in yo
     done &
     exec ldwm
 
-You can define colors for your status bar in config.h and use them by inserting \x01, \x02, etc. in your xsetroot. For example:
+You can define colors for your status bar in config.h and reference them with \x01, \x02, etc. For example:
     
     colored () {
         echo -e "\x01This text is \x02colored!"
