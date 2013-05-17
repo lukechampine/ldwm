@@ -1,7 +1,7 @@
 ldwm - less dynamic window manager
 ============================
 ldwm is a less functional fork of dwm, an extremely fast, small, and dynamic window manager for X.
-ldwm removes some features of dwm such as multi-monitor support, but also makes certain things (such as customizing status bar colors) easier.
+ldwm removes some features of dwm such as multi-monitor support, but also makes certain things easier, such as customizing status bar colors.
 
 
 Requirements
@@ -11,9 +11,9 @@ In order to build ldwm you need the Xlib header files.
 
 Installation
 ------------
-Edit config.mk to match your local setup (dwm is installed into the /usr/local namespace by default).
+Edit config.mk to match your local setup (ldwm is installed into the /usr/local namespace by default).
 
-Afterwards enter the following command to build and install dwm (as root if necessary):
+Afterwards enter the following command to build and install ldwm (as root if necessary):
 
     make clean install
 
@@ -23,8 +23,7 @@ Add the following line to your .xinitrc to start dwm using startx:
 
     exec ldwm
 
-In order to display status info in the bar, you can do something
-like this in your .xinitrc:
+In order to display status info in the bar, you can do something like this in your .xinitrc:
 
     while xsetroot -name "`date` `uptime | sed 's/.*,//'`"
     do
@@ -45,4 +44,4 @@ To add icons to your tags or status bar, edit your config.h to use a custom font
 
 Configuration
 -------------
-The configuration of dwm is done by creating a custom config.h and recompiling the source code. Otherwise, config.h will be generated automatically from config.def.h.
+The configuration of ldwm is done by creating a custom config.h and recompiling the source code. Otherwise, config.h will be generated automatically from config.def.h.
