@@ -3,6 +3,7 @@ ldwm - less dynamic window manager
 ldwm is a less functional fork of dwm, an extremely fast, small, and dynamic window manager for X.
 ldwm removes some features of dwm such as multi-monitor support, but also makes certain things easier, such as customizing status bar colors.
 
+dwm can be found here: http://dwm.suckless.org/
 
 Requirements
 ------------
