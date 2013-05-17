@@ -55,7 +55,7 @@
 
 /* enums */
 enum { CurNormal, CurResize, CurMove, CurLast };        /* cursor */
-enum { ColBorder, ColFG, ColBG, ColLast };              /* color */
+enum { ColFG, ColBG, ColLast };                         /* color */
 enum { NetSupported, NetWMName, NetWMState,
        NetWMFullscreen, NetActiveWindow, NetWMWindowType,
        NetWMWindowTypeDialog, NetClientList, NetLast };     /* EWMH atoms */
@@ -97,7 +97,7 @@ struct Client {
 
 typedef struct {
 	int x, y, w, h;
-	unsigned long colors[MAXCOLORS][ColLast];
+	unsigned long colors[MAXCOLORS][2];
  	Drawable drawable;
 	GC gc;
 	struct {
@@ -274,7 +274,7 @@ static Bool running = True;
 static Cursor cursor[CurLast];
 static Display *dpy;
 static DC dc;
-unsigned long wcolors[2][ColLast];
+unsigned long bcolors[2];
 unsigned long tcolors[2][ColLast];
 unsigned long scolors[MAXCOLORS][ColLast];
 static Monitor *mons = NULL, *selmon = NULL;
@@ -834,7 +834,7 @@ focus(Client *c) {
 		detachstack(c);
 		attachstack(c);
 		grabbuttons(c, True);
-		XSetWindowBorder(dpy, c->win, wcolors[0][ColBorder]);
+		XSetWindowBorder(dpy, c->win, bcolors[0]);
 		setfocus(c);
 	}
 	else {
@@ -1099,7 +1099,7 @@ manage(Window w, XWindowAttributes *wa) {
 
 	wc.border_width = c->bw;
 	XConfigureWindow(dpy, w, CWBorderWidth, &wc);
-	XSetWindowBorder(dpy, w, wcolors[0][ColBorder]);
+	XSetWindowBorder(dpy, w, bcolors[0]);
 	configure(c); /* propagates border_width, if size doesn't change */
 	updatewindowtype(c);
 	updatesizehints(c);
@@ -1578,16 +1578,12 @@ setup(void) {
 	cursor[CurMove] = XCreateFontCursor(dpy, XC_fleur);
 	/* init appearance */
     for(int i=0; i<2; i++) {
-		wcolors[i][ColBorder] = getcolor( wincolors[i][ColBorder] );
-		wcolors[i][ColFG] = getcolor( wincolors[i][ColFG] );
-		wcolors[i][ColBG] = getcolor( wincolors[i][ColBG] );
+		bcolors[i] = getcolor( bordercolors[i] );
 
-		tcolors[i][ColBorder] = getcolor( tagcolors[i][ColBorder] );
 		tcolors[i][ColFG] = getcolor( tagcolors[i][ColFG] );
 		tcolors[i][ColBG] = getcolor( tagcolors[i][ColBG] );
     }
 	for(int i=0; i<NUMCOLORS; i++) {
-		scolors[i][ColBorder] = getcolor( statuscolors[i][ColBorder] );
 		scolors[i][ColFG] = getcolor( statuscolors[i][ColFG] );
 		scolors[i][ColBG] = getcolor( statuscolors[i][ColBG] );
 	}
@@ -1761,7 +1757,7 @@ unfocus(Client *c, Bool setfocus) {
 	if(!c)
 		return;
 	grabbuttons(c, False);
-	XSetWindowBorder(dpy, c->win, wcolors[1][ColBorder]);
+	XSetWindowBorder(dpy, c->win, bcolors[1]);
 	if(setfocus) {
 		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
 		XDeleteProperty(dpy, root, netatom[NetActiveWindow]);

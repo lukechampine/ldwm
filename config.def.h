@@ -3,25 +3,23 @@
 /* appearance */
 static const char font[]            = "-*-terminus-medium-r-*-*-16-*-*-*-*-*-*-*";
 
-static const char wincolors[2][ColLast][8] = { 
-/*  border     foreground background */
-  { "#696969", "#eeeeee", "#121212" }, /* selected */
-  { "#212121", "#696969", "#121212" }, /* unselected */
-};
+static const char bordercolors[2][8] =
+   /* focused,   unfocused */
+    { "#696969", "#212121" };
 
-static const char tagcolors[2][ColLast][8] = { 
-/*  border     foreground background */
-  { "#212121", "#696969", "#121212" }, /* selected */
-  { "#696969", "#eeeeee", "#121212" }, /* unselected */
+static const char tagcolors[2][ColLast][8] = {
+   /* foreground background */
+    { "#696969", "#121212" }, /* selected */
+    { "#eeeeee", "#121212" }, /* unselected */
 };
 
 #define NUMCOLORS 4
 static const char statuscolors[NUMCOLORS][ColLast][8] = {
-/*  border     foreground background */
-  { "#FFFFFF", "#363636", "#121212" }, // 1 = black to gray
-  { "#FFFFFF", "#eeeeee", "#363636" }, // 2 = white on gray
-  { "#FFFFFF", "#121212", "#363636" }, // 3 = gray to black
-  { "#FFFFFF", "#eeeeee", "#121212" }, // 4 = white on black
+   /* foreground background */
+    { "#363636", "#121212" }, // 1 = black to gray
+    { "#eeeeee", "#363636" }, // 2 = white on gray
+    { "#121212", "#363636" }, // 3 = gray to black
+    { "#eeeeee", "#121212" }, // 4 = white on black
 };
 
 static const unsigned int borderpx  = 1;        /* border pixel of windows */
