@@ -17,9 +17,9 @@ Afterwards enter the following command to build and install ldwm (as root if nec
 
     make clean install
 
-Running dwm
+Running ldwm
 -----------
-Add the following line to your .xinitrc to start dwm using startx:
+Add the following line to your .xinitrc to start ldwm using startx:
 
     exec ldwm
 
