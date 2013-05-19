@@ -174,6 +174,7 @@ static void drawbar(Monitor *m);
 static void drawcoloredtext(char *text);
 static void drawsquare(Bool filled, Bool empty, unsigned long col[ColLast]);
 static void drawtext(const char *text, unsigned long col[ColLast], Bool pad);
+static void enternotify(XEvent *e);
 static void focus(Client *c);
 static void focusin(XEvent *e);
 static void focusstack(const Arg *arg);
@@ -253,6 +254,7 @@ static void (*handler[LASTEvent]) (XEvent *) = {
 	[ConfigureRequest] = configurerequest,
 	[ConfigureNotify] = configurenotify,
 	[DestroyNotify] = destroynotify,
+    [EnterNotify] = enternotify,
 	[FocusIn] = focusin,
 	[KeyPress] = keypress,
 	[MappingNotify] = mappingnotify,
@@ -770,6 +772,22 @@ drawtext(const char *text, unsigned long col[ColLast], Bool pad) {
 	else
 		XDrawString(dpy, dc.drawable, dc.gc, x, y, buf, len);
 }
+
+
+void
+enternotify(XEvent *e) {
+    Monitor *m = mons;
+    XCrossingEvent *ev = &e->xcrossing;
+    Client *c = wintoclient(ev->window);
+
+    if((ev->mode != NotifyNormal || ev->detail == NotifyInferior) && ev->window != root)
+        return;
+    else if(!c || c == m->sel)
+        return;
+    else
+        focus(c);
+}
+
 
 void
 focus(Client *c) {
