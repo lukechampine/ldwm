@@ -175,6 +175,7 @@ static void drawcoloredtext(char *text);
 static void drawsquare(Bool filled, Bool empty, unsigned long col[ColLast]);
 static void drawtext(const char *text, unsigned long col[ColLast], Bool pad);
 static void enternotify(XEvent *e);
+static void expose(XEvent *e);
 static void focus(Client *c);
 static void focusin(XEvent *e);
 static void focusstack(const Arg *arg);
@@ -255,6 +256,7 @@ static void (*handler[LASTEvent]) (XEvent *) = {
 	[ConfigureNotify] = configurenotify,
 	[DestroyNotify] = destroynotify,
     [EnterNotify] = enternotify,
+    [Expose] = expose,
 	[FocusIn] = focusin,
 	[KeyPress] = keypress,
 	[MappingNotify] = mappingnotify,
@@ -788,6 +790,13 @@ enternotify(XEvent *e) {
         focus(c);
 }
 
+void
+expose(XEvent *e) {
+    XExposeEvent *ev = &e->xexpose;
+    
+    if(ev->count == 0)
+        drawbar(mons);
+}
 
 void
 focus(Client *c) {
@@ -810,6 +819,7 @@ focus(Client *c) {
 		XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
 	}
 	mons->sel = c;
+    drawbar(mons);
 }
 
 void
@@ -1041,10 +1051,12 @@ manage(Window w, XWindowAttributes *wa) {
 	c->win = w;
 	updatetitle(c);
 	if(XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))) {
+        fprintf(stderr, "dwm: it happened!\n");
 		c->mon = t->mon;
 		c->tags = t->tags;
 	}
 	else {
+        fprintf(stderr, "dwm: the other thing happened!\n");
 		c->mon = mons;
 		applyrules(c);
 	}
@@ -1214,6 +1226,7 @@ propertynotify(XEvent *e) {
 			break;
 		case XA_WM_HINTS:
 			updatewmhints(c);
+            drawbar(mons);
 			break;
 		}
 		if(ev->atom == XA_WM_NAME || ev->atom == netatom[NetWMName]) {
