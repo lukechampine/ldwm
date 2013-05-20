@@ -159,7 +159,6 @@ static void attachstack(Client *c);
 static void buttonpress(XEvent *e);
 static void checkotherwm(void);
 static void cleanup(void);
-static void cleanupmon(Monitor *mon);
 static void clearurgent(Client *c);
 static void clientmessage(XEvent *e);
 static void configure(Client *c);
@@ -470,17 +469,12 @@ cleanup(void) {
 	XFreeCursor(dpy, cursor[CurNormal]);
 	XFreeCursor(dpy, cursor[CurResize]);
 	XFreeCursor(dpy, cursor[CurMove]);
-	cleanupmon(mons);
+	XUnmapWindow(dpy, mons->barwin);
+	XDestroyWindow(dpy, mons->barwin);
+	free(mons);
 	XSync(dpy, False);
 	XSetInputFocus(dpy, PointerRoot, RevertToPointerRoot, CurrentTime);
 	XDeleteProperty(dpy, root, netatom[NetActiveWindow]);
-}
-
-void
-cleanupmon(Monitor *mon) {
-	XUnmapWindow(dpy, mon->barwin);
-	XDestroyWindow(dpy, mon->barwin);
-	free(mon);
 }
 
 void
@@ -1050,16 +1044,14 @@ manage(Window w, XWindowAttributes *wa) {
 		die("fatal: could not malloc() %u bytes\n", sizeof(Client));
 	c->win = w;
 	updatetitle(c);
-	if(XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))) {
-        fprintf(stderr, "dwm: it happened!\n");
+	/*if(XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))) {
 		c->mon = t->mon;
 		c->tags = t->tags;
 	}
-	else {
-        fprintf(stderr, "dwm: the other thing happened!\n");
+	else {*/
 		c->mon = mons;
 		applyrules(c);
-	}
+	//}
 	/* geometry */
 	c->x = c->oldx = wa->x;
 	c->y = c->oldy = wa->y;
