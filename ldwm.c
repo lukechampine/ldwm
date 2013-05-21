@@ -44,7 +44,7 @@
 #define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
 #define INTERSECT(x,y,w,h,m)    (MAX(0, MIN((x)+(w),(m)->wx+(m)->ww) - MAX((x),(m)->wx)) \
                                * MAX(0, MIN((y)+(h),(m)->wy+(m)->wh) - MAX((y),(m)->wy)))
-#define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->seltags]))
+#define ISVISIBLE(C)            ((C->tags & mons->tagset[mons->seltags]))
 #define LENGTH(X)               (sizeof X / sizeof X[0])
 #define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
 #define WIDTH(X)                ((X)->w + 2 * (X)->bw)
@@ -91,7 +91,6 @@ struct Client {
 	Bool isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen;
 	Client *next;
 	Client *snext;
-	Monitor *mon;
 	Window win;
 };
 
@@ -308,13 +307,13 @@ applyrules(Client *c) {
 		XFree(ch.res_class);
 	if(ch.res_name)
 		XFree(ch.res_name);
-	c->tags = c->tags & TAGMASK ? c->tags & TAGMASK : c->mon->tagset[c->mon->seltags];
+	c->tags = c->tags & TAGMASK ? c->tags & TAGMASK : mons->tagset[mons->seltags];
 }
 
 Bool
 applysizehints(Client *c, int *x, int *y, int *w, int *h, Bool interact) {
 	Bool baseismin;
-	Monitor *m = c->mon;
+	Monitor *m = mons;
 
 	/* set minimum possible */
 	*w = MAX(1, *w);
@@ -343,7 +342,7 @@ applysizehints(Client *c, int *x, int *y, int *w, int *h, Bool interact) {
 		*h = bh;
 	if(*w < bh)
 		*w = bh;
-	if(resizehints || c->isfloating || !c->mon->lt[c->mon->sellt]->arrange) {
+	if(resizehints || c->isfloating || !mons->lt[mons->sellt]->arrange) {
 		/* see last two sentences in ICCCM 4.1.2.3 */
 		baseismin = c->basew == c->minw && c->baseh == c->minh;
 		if(!baseismin) { /* temporarily remove base dimensions */
@@ -395,14 +394,14 @@ arrangemon(Monitor *m) {
 
 void
 attach(Client *c) {
-	c->next = c->mon->clients;
-	c->mon->clients = c;
+	c->next = mons->clients;
+	mons->clients = c;
 }
 
 void
 attachstack(Client *c) {
-	c->snext = c->mon->stack;
-	c->mon->stack = c;
+	c->snext = mons->stack;
+	mons->stack = c;
 }
 
 void
@@ -503,8 +502,8 @@ clientmessage(XEvent *e) {
 	}
 	else if(cme->message_type == netatom[NetActiveWindow]) {
 		if(!ISVISIBLE(c)) {
-			c->mon->seltags ^= 1;
-			c->mon->tagset[c->mon->seltags] = c->tags;
+			mons->seltags ^= 1;
+			mons->tagset[mons->seltags] = c->tags;
 		}
 		pop(c);
 	}
@@ -554,7 +553,7 @@ configurenotify(XEvent *e) {
 void
 configurerequest(XEvent *e) {
 	Client *c;
-	Monitor *m;
+	Monitor *m = mons;
 	XConfigureRequestEvent *ev = &e->xconfigurerequest;
 	XWindowChanges wc;
 
@@ -562,7 +561,6 @@ configurerequest(XEvent *e) {
 		if(ev->value_mask & CWBorderWidth)
 			c->bw = ev->border_width;
 		else if(c->isfloating || !mons->lt[mons->sellt]->arrange) {
-			m = c->mon;
 			if(ev->value_mask & CWX) {
 				c->oldx = c->x;
 				c->x = m->mx + ev->x;
@@ -634,7 +632,7 @@ void
 detach(Client *c) {
 	Client **tc;
 
-	for(tc = &c->mon->clients; *tc && *tc != c; tc = &(*tc)->next);
+	for(tc = &mons->clients; *tc && *tc != c; tc = &(*tc)->next);
 	*tc = c->next;
 }
 
@@ -642,12 +640,12 @@ void
 detachstack(Client *c) {
 	Client **tc, *t;
 
-	for(tc = &c->mon->stack; *tc && *tc != c; tc = &(*tc)->snext);
+	for(tc = &mons->stack; *tc && *tc != c; tc = &(*tc)->snext);
 	*tc = c->snext;
 
-	if(c == c->mon->sel) {
-		for(t = c->mon->stack; t && !ISVISIBLE(t); t = t->snext);
-		c->mon->sel = t;
+	if(c == mons->sel) {
+		for(t = mons->stack; t && !ISVISIBLE(t); t = t->snext);
+		mons->sel = t;
 	}
 }
 
@@ -1036,7 +1034,7 @@ killclient(const Arg *arg) {
 
 void
 manage(Window w, XWindowAttributes *wa) {
-	Client *c, *t = NULL;
+	Client *c = NULL;
 	Window trans = None;
 	XWindowChanges wc;
 
@@ -1044,14 +1042,8 @@ manage(Window w, XWindowAttributes *wa) {
 		die("fatal: could not malloc() %u bytes\n", sizeof(Client));
 	c->win = w;
 	updatetitle(c);
-	/*if(XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))) {
-		c->mon = t->mon;
-		c->tags = t->tags;
-	}
-	else {*/
-		c->mon = mons;
-		applyrules(c);
-	//}
+	applyrules(c);
+
 	/* geometry */
 	c->x = c->oldx = wa->x;
 	c->y = c->oldy = wa->y;
@@ -1059,14 +1051,14 @@ manage(Window w, XWindowAttributes *wa) {
 	c->h = c->oldh = wa->height;
 	c->oldbw = wa->border_width;
 
-	if(c->x + WIDTH(c) > c->mon->mx + c->mon->mw)
-		c->x = c->mon->mx + c->mon->mw - WIDTH(c);
-	if(c->y + HEIGHT(c) > c->mon->my + c->mon->mh)
-		c->y = c->mon->my + c->mon->mh - HEIGHT(c);
-	c->x = MAX(c->x, c->mon->mx);
+	if(c->x + WIDTH(c) > mons->mx + mons->mw)
+		c->x = mons->mx + mons->mw - WIDTH(c);
+	if(c->y + HEIGHT(c) > mons->my + mons->mh)
+		c->y = mons->my + mons->mh - HEIGHT(c);
+	c->x = MAX(c->x, mons->mx);
 	/* only fix client y-offset, if the client center might cover the bar */
-	c->y = MAX(c->y, ((c->mon->by == c->mon->my) && (c->x + (c->w / 2) >= c->mon->wx)
-	           && (c->x + (c->w / 2) < c->mon->wx + c->mon->ww)) ? bh : c->mon->my);
+	c->y = MAX(c->y, ((mons->by == mons->my) && (c->x + (c->w / 2) >= mons->wx)
+	           && (c->x + (c->w / 2) < mons->wx + mons->ww)) ? bh : mons->my);
 	c->bw = borderpx;
 
 	wc.border_width = c->bw;
@@ -1088,8 +1080,8 @@ manage(Window w, XWindowAttributes *wa) {
 	                (unsigned char *) &(c->win), 1);
 	XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this */
 	setclientstate(c, NormalState);
-	c->mon->sel = c;
-	arrange(c->mon);
+	mons->sel = c;
+	arrange(mons);
 	XMapWindow(dpy, c->win);
 	focus(NULL);
 }
@@ -1192,7 +1184,7 @@ pop(Client *c) {
 	detach(c);
 	attach(c);
 	focus(c);
-	arrange(c->mon);
+	arrange(mons);
 }
 
 void
@@ -1211,7 +1203,7 @@ propertynotify(XEvent *e) {
 		case XA_WM_TRANSIENT_FOR:
 			if(!c->isfloating && (XGetTransientForHint(dpy, c->win, &trans)) &&
 			   (c->isfloating = (wintoclient(trans)) != NULL))
-				arrange(c->mon);
+				arrange(mons);
 			break;
 		case XA_WM_NORMAL_HINTS:
 			updatesizehints(c);
@@ -1223,8 +1215,8 @@ propertynotify(XEvent *e) {
 		}
 		if(ev->atom == XA_WM_NAME || ev->atom == netatom[NetWMName]) {
 			updatetitle(c);
-			if(c == c->mon->sel)
-				drawbar(c->mon);
+			if(c == mons->sel)
+				drawbar(mons);
 		}
 		if(ev->atom == netatom[NetWMWindowType])
 			updatewindowtype(c);
@@ -1285,8 +1277,8 @@ resizemouse(const Arg *arg) {
 		case MotionNotify:
 			nw = MAX(ev.xmotion.x - ocx - 2 * c->bw + 1, 1);
 			nh = MAX(ev.xmotion.y - ocy - 2 * c->bw + 1, 1);
-			if(c->mon->wx + nw >= mons->wx && c->mon->wx + nw <= mons->wx + mons->ww
-			&& c->mon->wy + nh >= mons->wy && c->mon->wy + nh <= mons->wy + mons->wh)
+			if(mons->wx + nw >= mons->wx && mons->wx + nw <= mons->wx + mons->ww
+			&& mons->wy + nh >= mons->wy && mons->wy + nh <= mons->wy + mons->wh)
 			{
 				if(!c->isfloating && mons->lt[mons->sellt]->arrange
 				&& (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
@@ -1415,7 +1407,7 @@ setfullscreen(Client *c, Bool fullscreen) {
 		c->oldbw = c->bw;
 		c->bw = 0;
 		c->isfloating = True;
-		resizeclient(c, c->mon->mx, c->mon->my, c->mon->mw, c->mon->mh);
+		resizeclient(c, mons->mx, mons->my, mons->mw, mons->mh);
 		XRaiseWindow(dpy, c->win);
 	}
 	else {
@@ -1429,7 +1421,7 @@ setfullscreen(Client *c, Bool fullscreen) {
 		c->w = c->oldw;
 		c->h = c->oldh;
 		resizeclient(c, c->x, c->y, c->w, c->h);
-		arrange(c->mon);
+		arrange(mons);
 	}
 }
 
@@ -1530,7 +1522,7 @@ showhide(Client *c) {
 		return;
 	if(ISVISIBLE(c)) { /* show clients top down */
 		XMoveWindow(dpy, c->win, c->x, c->y);
-		if((!c->mon->lt[c->mon->sellt]->arrange || c->isfloating) && !c->isfullscreen)
+		if((!mons->lt[mons->sellt]->arrange || c->isfloating) && !c->isfullscreen)
 			resize(c, c->x, c->y, c->w, c->h, False);
 		showhide(c->snext);
 	}
@@ -1682,7 +1674,7 @@ unfocus(Client *c, Bool setfocus) {
 
 void
 unmanage(Client *c, Bool destroyed) {
-	Monitor *m = c->mon;
+	Monitor *m = mons;
 	XWindowChanges wc;
 
 	/* The server grab construct avoids race conditions. */
