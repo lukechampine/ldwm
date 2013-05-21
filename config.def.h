@@ -25,6 +25,7 @@ static const char statuscolors[NUMCOLORS][ColLast][8] = {
 static const unsigned int borderpx  = 1;        /* border pixel of windows */
 static const unsigned int paddingpx = 10;       /* window padding */
 static const unsigned int snap      = 10;       /* snap pixel */
+static const Bool singlegap         = True;     /* False means double-sized gaps */
 static const Bool showbar           = True;     /* False means no bar */
 static const Bool topbar            = True;     /* False means bottom bar */
 

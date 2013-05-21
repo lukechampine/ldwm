@@ -1576,12 +1576,14 @@ textnw(const char *text, unsigned int len) {
 
 void
 tile(void) {
-	unsigned int i, n, h, mw, my, ty;
+	unsigned int i, n, h, mw, my, ty, numgaps;
 	Client *c;
 
 	for(n = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), n++);
 	if(n == 0)
 		return;
+
+	numgaps = (singlegap && n != 1) ? 1 : 2;
 
 	if(n > mons->nmaster)
 		mw = mons->nmaster ? mons->ww * mons->mfact : 0;
@@ -1590,15 +1592,15 @@ tile(void) {
 	for(i = my = ty = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), i++)
 		if(i < mons->nmaster) {
 			h = (mons->wh - my) / (MIN(n, mons->nmaster) - i);
-			resize(c, mons->wx + paddingpx, mons->wy + my + paddingpx,
-                      mw - 2*(c->bw + paddingpx), h - 2*(c->bw + paddingpx), False);
+            resize(c, mons->wx + paddingpx, mons->wy + my + paddingpx,
+                      mw - numgaps*(c->bw + paddingpx), h - 2*(c->bw + paddingpx), False);
 			my += HEIGHT(c) + paddingpx;
 		}
 		else {
 			h = (mons->wh - ty) / (n - i);
 			resize(c, mons->wx + mw + paddingpx, mons->wy + ty + paddingpx,
                       mons->ww - mw - 2*(c->bw + paddingpx), h - 2*(c->bw + paddingpx), False);
-			ty += HEIGHT(c) + paddingpx;
+			ty += HEIGHT(c) + numgaps*paddingpx - (2-numgaps)*(c->bw);
 		}
 }
 
