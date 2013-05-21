@@ -23,7 +23,8 @@ static const char statuscolors[NUMCOLORS][ColLast][8] = {
 };
 
 static const unsigned int borderpx  = 1;        /* border pixel of windows */
-static const unsigned int snap      = 32;       /* snap pixel */
+static const unsigned int paddingpx = 10;       /* window padding */
+static const unsigned int snap      = 10;       /* snap pixel */
 static const Bool showbar           = True;     /* False means no bar */
 static const Bool topbar            = True;     /* False means bottom bar */
 
@@ -32,7 +33,7 @@ static const char *tags[] = { "1", "2", "3" };
 
 static const Rule rules[] = {
 	/* class      instance    title       tags mask     isfloating */
-	{ "Firefox",  NULL,       NULL,       2,            False },
+	{ "Firefox",  NULL,       NULL,       2,            True },
 };
 
 /* layout(s) */

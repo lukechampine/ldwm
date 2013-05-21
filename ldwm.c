@@ -149,7 +149,6 @@ typedef struct {
 static void applyrules(Client *c);
 static Bool applysizehints(Client *c, int *x, int *y, int *w, int *h, Bool interact);
 static void arrange(void);
-static void arrangemon(void);
 static void attach(Client *c);
 static void attachstack(Client *c);
 static void buttonpress(XEvent *e);
@@ -376,16 +375,11 @@ void
 arrange(void) {
 	if(mons) {
 		showhide(mons->stack);
-		arrangemon();
+    	strncpy(mons->ltsymbol, mons->lt[mons->sellt]->symbol, sizeof mons->ltsymbol);
+    	if(mons->lt[mons->sellt]->arrange)
+    		mons->lt[mons->sellt]->arrange();
 		restack();
     }
-}
-
-void
-arrangemon(void) {
-	strncpy(mons->ltsymbol, mons->lt[mons->sellt]->symbol, sizeof mons->ltsymbol);
-	if(mons->lt[mons->sellt]->arrange)
-		mons->lt[mons->sellt]->arrange();
 }
 
 void
@@ -1596,13 +1590,15 @@ tile(void) {
 	for(i = my = ty = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), i++)
 		if(i < mons->nmaster) {
 			h = (mons->wh - my) / (MIN(n, mons->nmaster) - i);
-			resize(c, mons->wx, mons->wy + my, mw - (2*c->bw), h - (2*c->bw), False);
-			my += HEIGHT(c);
+			resize(c, mons->wx + paddingpx, mons->wy + my + paddingpx,
+                      mw - 2*(c->bw + paddingpx), h - 2*(c->bw + paddingpx), False);
+			my += HEIGHT(c) + paddingpx;
 		}
 		else {
 			h = (mons->wh - ty) / (n - i);
-			resize(c, mons->wx + mw, mons->wy + ty, mons->ww - mw - (2*c->bw), h - (2*c->bw), False);
-			ty += HEIGHT(c);
+			resize(c, mons->wx + mw + paddingpx, mons->wy + ty + paddingpx,
+                      mons->ww - mw - 2*(c->bw + paddingpx), h - 2*(c->bw + paddingpx), False);
+			ty += HEIGHT(c) + paddingpx;
 		}
 }
 
@@ -1748,7 +1744,6 @@ updategeom(void) {
 	if(!mons)
 		mons = createmon();
 	if(mons->mw != sw || mons->mh != sh) {
-        fprintf(stderr, "dirty\n");
 		dirty = True;
 		mons->mw = mons->ww = sw;
 		mons->mh = mons->wh = sh;
