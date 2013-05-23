@@ -211,6 +211,7 @@ static void spawn(const Arg *arg);
 static void tag(const Arg *arg);
 static int textnw(const char *text, unsigned int len);
 static void tile(void);
+static void tilegap(void);
 static void togglebar(const Arg *arg);
 static void togglefloating(const Arg *arg);
 static void toggletag(const Arg *arg);
@@ -1576,6 +1577,35 @@ textnw(const char *text, unsigned int len) {
 
 void
 tile(void) {
+	unsigned int i, n, h, mw, my, ty, numgaps;
+	Client *c;
+
+	for(n = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), n++);
+	if(n == 0)
+		return;
+
+	numgaps = (singlegap && n != 1) ? 1 : 2;
+
+	if(n > mons->nmaster)
+		mw = mons->nmaster ? mons->ww * mons->mfact : 0;
+	else
+		mw = mons->ww;
+	for(i = my = ty = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), i++)
+		if(i < mons->nmaster) {
+			h = (mons->wh - my) / (MIN(n, mons->nmaster) - i);
+            resize(c, mons->wx, mons->wy + my, mw - numgaps*(c->bw), h - 2*(c->bw), False);
+			my += HEIGHT(c);
+		}
+		else {
+			h = (mons->wh - ty) / (n - i);
+			resize(c, mons->wx + mw, mons->wy + ty,
+                      mons->ww - mw - 2*(c->bw), h - 2*(c->bw), False);
+			ty += HEIGHT(c) - (2-numgaps)*(c->bw);
+		}
+}
+
+void
+tilegap(void) {
 	unsigned int i, n, h, mw, my, ty, numgaps;
 	Client *c;
 
