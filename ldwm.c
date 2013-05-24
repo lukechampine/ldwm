@@ -117,6 +117,7 @@ typedef struct {
 	void (*arrange)(void);
 } Layout;
 
+typedef struct Pertag Pertag;
 struct Monitor {
 	char ltsymbol[16];
 	float mfact;
@@ -135,6 +136,7 @@ struct Monitor {
 	Client *stack;
 	Window barwin;
 	const Layout *lt[2];
+    Pertag *pertag;
 };
 
 typedef struct {
@@ -272,6 +274,15 @@ static Window root;
 
 /* configuration, allows nested code to access above variables */
 #include "config.h"
+
+struct Pertag {
+   unsigned int curtag, prevtag; /* current and previous tag */
+   int nmasters[LENGTH(tags) + 1]; /* number of windows in master area */
+   float mfacts[LENGTH(tags) + 1]; /* mfacts per tag */
+   unsigned int sellts[LENGTH(tags) + 1]; /* selected layouts */
+   const Layout *ltidxs[LENGTH(tags) + 1][2]; /* matrix of tags and layouts indexes  */
+};
+
 
 /* compile-time check if all tags fit into an unsigned int bit array. */
 struct NumTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
@@ -593,9 +604,12 @@ configurerequest(XEvent *e) {
 Monitor *
 createmon(void) {
 	Monitor *m;
+    int i;
 
 	if(!(m = (Monitor *)calloc(1, sizeof(Monitor))))
 		die("fatal: could not malloc() %u bytes\n", sizeof(Monitor));
+    if(!(m->pertag = (Pertag *)calloc(1, sizeof(Pertag))))
+       die("fatal: could not malloc() %u bytes\n", sizeof(Pertag));
 	m->tagset[0] = m->tagset[1] = 1;
 	m->mfact = mfact;
 	m->nmaster = nmaster;
@@ -604,6 +618,14 @@ createmon(void) {
 	m->lt[0] = &layouts[0];
 	m->lt[1] = &layouts[1 % LENGTH(layouts)];
 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
+    m->pertag->curtag = m->pertag->prevtag = 1;
+    for(i=0; i <= LENGTH(tags); i++) {
+        m->pertag->nmasters[i] = m->nmaster;
+        m->pertag->mfacts[i] = m->mfact;
+        m->pertag->ltidxs[i][0] = m->lt[0];
+        m->pertag->ltidxs[i][1] = m->lt[1];
+        m->pertag->sellts[i] = m->sellt;
+    }
 	return m;
 }
 
@@ -952,7 +974,7 @@ grabkeys(void) {
 
 void
 incnmaster(const Arg *arg) {
-	mons->nmaster = MAX(mons->nmaster + arg->i, 0);
+    mons->nmaster = mons->pertag->nmasters[mons->pertag->curtag] = MAX(mons->nmaster + arg->i, 0);
 	arrange();
 }
 
@@ -1414,10 +1436,14 @@ setfullscreen(Client *c, Bool fullscreen) {
 
 void
 setlayout(const Arg *arg) {
-	if(!arg || !arg->v || arg->v != mons->lt[mons->sellt])
-		mons->sellt ^= 1;
+    if(!arg || !arg->v || arg->v != mons->lt[mons->sellt]) {
+        mons->pertag->sellts[mons->pertag->curtag] ^= 1;
+        mons->sellt = mons->pertag->sellts[mons->pertag->curtag];
+    }
+
 	if(arg && arg->v)
-		mons->lt[mons->sellt] = (Layout *)arg->v;
+        mons->pertag->ltidxs[mons->pertag->curtag][mons->sellt] = (Layout *)arg->v;
+    mons->lt[mons->sellt] = mons->pertag->ltidxs[mons->pertag->curtag][mons->sellt];
 	strncpy(mons->ltsymbol, mons->lt[mons->sellt]->symbol, sizeof mons->ltsymbol);
 	if(mons->sel)
 		arrange();
@@ -1435,7 +1461,7 @@ setmfact(const Arg *arg) {
 	f = arg->f < 1.0 ? arg->f + mons->mfact : arg->f - 1.0;
 	if(f < 0.1 || f > 0.9)
 		return;
-	mons->mfact = f;
+    mons->mfact = mons->pertag->mfacts[mons->pertag->curtag] = f;
 	arrange();
 }
 
@@ -1672,9 +1698,28 @@ toggletag(const Arg *arg) {
 void
 toggleview(const Arg *arg) {
 	unsigned int newtagset = mons->tagset[mons->seltags] ^ (arg->ui & TAGMASK);
+    int i;
 
 	if(newtagset) {
+        if(newtagset == ~0) {
+            mons->pertag->prevtag = mons->pertag->curtag;
+            mons->pertag->curtag = 0;
+        }
+        /* test if the user did not select the same tag */
+        if(!(newtagset & 1 << (mons->pertag->curtag - 1))) {
+            mons->pertag->prevtag = mons->pertag->curtag;
+            for (i=0; !(newtagset & 1 << i); i++) ;
+            mons->pertag->curtag = i + 1;
+        }
 		mons->tagset[mons->seltags] = newtagset;
+
+        /* apply settings for this view */
+        mons->nmaster = mons->pertag->nmasters[mons->pertag->curtag];
+        mons->mfact = mons->pertag->mfacts[mons->pertag->curtag];
+        mons->sellt = mons->pertag->sellts[mons->pertag->curtag];
+        mons->lt[mons->sellt] = mons->pertag->ltidxs[mons->pertag->curtag][mons->sellt];
+        mons->lt[mons->sellt^1] = mons->pertag->ltidxs[mons->pertag->curtag][mons->sellt^1];
+
 		focus(NULL);
 		arrange();
 	}
@@ -1896,11 +1941,32 @@ updatewmhints(Client *c) {
 
 void
 view(const Arg *arg) {
+    int i;
+    unsigned int tmptag;
+
 	if((arg->ui & TAGMASK) == mons->tagset[mons->seltags])
 		return;
 	mons->seltags ^= 1; /* toggle sel tagset */
-	if(arg->ui & TAGMASK)
+	if(arg->ui & TAGMASK) {
+        mons->pertag->prevtag = mons->pertag->curtag;
 		mons->tagset[mons->seltags] = arg->ui & TAGMASK;
+        if(arg->ui == ~0)
+            mons->pertag->curtag = 0;
+        else {
+            for (i=0; !(arg->ui & 1 << i); i++) ;
+            mons->pertag->curtag = i + 1;
+        }
+    } else {
+        tmptag = mons->pertag->prevtag;
+        mons->pertag->prevtag = mons->pertag->curtag;
+        mons->pertag->curtag = tmptag;
+    }
+    mons->nmaster = mons->pertag->nmasters[mons->pertag->curtag];
+    mons->mfact = mons->pertag->mfacts[mons->pertag->curtag];
+    mons->sellt = mons->pertag->sellts[mons->pertag->curtag];
+    mons->lt[mons->sellt] = mons->pertag->ltidxs[mons->pertag->curtag][mons->sellt];
+    mons->lt[mons->sellt^1] = mons->pertag->ltidxs[mons->pertag->curtag][mons->sellt^1];
+
 	focus(NULL);
 	arrange();
 }
