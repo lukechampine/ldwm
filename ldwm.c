@@ -252,8 +252,8 @@ static void (*handler[LASTEvent]) (XEvent *) = {
 	[ConfigureRequest] = configurerequest,
 	[ConfigureNotify] = configurenotify,
 	[DestroyNotify] = destroynotify,
-    [EnterNotify] = enternotify,
-    [Expose] = expose,
+	[EnterNotify] = enternotify,
+	[Expose] = expose,
 	[FocusIn] = focusin,
 	[KeyPress] = keypress,
 	[MappingNotify] = mappingnotify,
@@ -412,6 +412,7 @@ buttonpress(XEvent *e) {
 	Arg arg = {0};
 	Client *c;
 	XButtonPressedEvent *ev = &e->xbutton;
+fprintf(stderr,"button clicked");
 
 	click = ClkRootWin;
 	if(ev->window == mons->barwin) {
@@ -431,6 +432,7 @@ buttonpress(XEvent *e) {
 			click = ClkWinTitle;
 	}
 	else if((c = wintoclient(ev->window))) {
+fprintf(stderr,"window clicked");
 		focus(c);
 		click = ClkClientWin;
 	}
@@ -782,7 +784,7 @@ void
 enternotify(XEvent *e) {
     XCrossingEvent *ev = &e->xcrossing;
     Client *c = wintoclient(ev->window);
-
+fprintf(stderr,"enternotify\n");
     if((ev->mode != NotifyNormal || ev->detail == NotifyInferior) && ev->window != root)
         return;
     else if(!c || c == mons->sel)
@@ -1089,6 +1091,7 @@ manage(Window w, XWindowAttributes *wa) {
 	                (unsigned char *) &(c->win), 1);
 	XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this */
 	setclientstate(c, NormalState);
+    unfocus(mons->sel, False);
 	mons->sel = c;
 	arrange();
 	XMapWindow(dpy, c->win);
