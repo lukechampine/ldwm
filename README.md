@@ -1,5 +1,5 @@
 ldwm - less dynamic window manager
-============================
+==================================
 ldwm is a less functional fork of dwm, an extremely fast, small, and dynamic window manager for X.
 ldwm removes some features of dwm such as multi-monitor support, but also makes certain things easier, such as customizing status bar colors.
 
@@ -19,7 +19,7 @@ Afterwards enter the following command to build and install ldwm (as root if nec
     make clean install
 
 Running ldwm
------------
+------------
 Add the following line to your .xinitrc to start ldwm using startx:
 
     exec ldwm
@@ -46,3 +46,16 @@ To add icons to your tags or status bar, edit your config.h to use a custom font
 Configuration
 -------------
 The configuration of ldwm is done by creating a custom config.h and recompiling the source code. Otherwise, config.h will be generated automatically from config.def.h.
+
+Summary of changes
+------------------
+Features removed:
+* Multi-monitor support
+* Multiple tag selection
+* Multiple tags per client
+
+Features added:
+* Per-tag layouts, nmaster/mfact values, etc.
+* Statusbar color support
+* "tilegap" layout
+* Prev/Next tag support (planned)
