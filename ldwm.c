@@ -669,10 +669,9 @@ drawbar(void) {
 	int x;
 	unsigned int i, occ = 0, urg = 0;
 	unsigned long *col;
-	Client *c = mons->clients;
-
+	Client *c;
 	for(c = mons->clients; c; c = c->next) {
-		occ = c->tag;
+		occ |= 1 << c->tag;
 		if(c->isurgent)
 			urg = c->tag;
 	}
@@ -681,7 +680,7 @@ drawbar(void) {
 		dc.w = TEXTW(tags[i]);
 		col = tcolors[(mons->seltag == i ? 1 : (urg == i ? 2:0))];
 		drawtext(tags[i], col, True);
-		drawsquare(mons->sel && mons->sel->tag == i, occ == i, col);
+		drawsquare(mons->sel && mons->sel->tag == i, occ & 1 << i, col);
 		dc.x += dc.w;
 	}
 	dc.w = blw = TEXTW(mons->ltsymbol);
@@ -1429,8 +1428,7 @@ setfullscreen(Client *c, Bool fullscreen) {
 void
 setlayout(const Arg *arg) {
     if(!arg || !arg->v || arg->v != mons->lt[mons->sellt]) { /* cycle through layouts */
-        mons->pertag->sellts[mons->pertag->curtag] += 1;
-        mons->pertag->sellts[mons->pertag->curtag] %= LENGTH(tags);
+        mons->pertag->sellts[mons->pertag->curtag] ^= 1;
         mons->sellt = mons->pertag->sellts[mons->pertag->curtag];
     }
     else if(arg && arg->v)
