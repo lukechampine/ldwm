@@ -4,7 +4,7 @@
 static const char font[]            = "-*-terminus-medium-r-*-*-16-*-*-*-*-*-*-*";
 
 static const char bordercolors[2][8] =
-   /* focused,   unfocused */
+   /* focused    unfocused */
     { "#696969", "#212121" };
 
 static const char tagcolors[2][ColLast][8] = {
@@ -33,8 +33,8 @@ static const Bool topbar            = True;     /* False means bottom bar */
 static const char *tags[] = { "1", "2", "3" };
 
 static const Rule rules[] = {
-	/* class      instance    title       tag mask      isfloating */
-	{ "Firefox",  NULL,       NULL,       2,            True },
+	/* class      instance    title       tag (0 for current)  isfloating */
+	{ "Firefox",  NULL,       NULL,       2,                   True },
 };
 
 /* layout(s) */

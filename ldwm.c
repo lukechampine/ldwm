@@ -290,7 +290,7 @@ applyrules(Client *c) {
 		&& (!r->instance || strstr(instance, r->instance)))
 		{
 			c->isfloating = r->isfloating;
-			c->tag = r->tag;
+			c->tag = (r->tag == 0) ? mons->curtag : r->tag - 1;
 		}
 	}
 	if(ch.res_class)
