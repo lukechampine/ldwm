@@ -41,7 +41,8 @@
 #define MIN(A, B)               ((A) < (B) ? (A) : (B))
 #define BUTTONMASK              (ButtonPressMask|ButtonReleaseMask)
 #define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
-#define ISVISIBLE(C)            ((C->tag == mons->seltag))
+#define curlayout               (layouts[mons->lt[mons->curtag]])
+#define ISVISIBLE(C)            ((C->tag == mons->curtag))
 #define LENGTH(X)               (sizeof X / sizeof X[0])
 #define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
 #define WIDTH(X)                ((X)->w + 2 * (X)->bw)
@@ -117,27 +118,6 @@ typedef struct {
 	void (*arrange)(void);
 } Layout;
 
-typedef struct Pertag Pertag;
-struct Monitor {
-	char ltsymbol[16];
-	float mfact;
-	int nmaster;
-	int num;
-	int by;               /* bar geometry */
-	int mx, my, mw, mh;   /* screen size */
-	int wx, wy, ww, wh;   /* window area  */
-    unsigned int seltag;
-	unsigned int sellt;
-	Bool showbar;
-	Bool topbar;
-	Client *clients;
-	Client *sel;
-	Client *stack;
-	Window barwin;
-	const Layout *lt[2];
-    Pertag *pertag;
-};
-
 typedef struct {
 	const char *class;
 	const char *instance;
@@ -171,11 +151,11 @@ static void drawsquare(Bool filled, Bool empty, unsigned long col[ColLast]);
 static void drawtext(const char *text, unsigned long col[ColLast], Bool pad);
 static void enternotify(XEvent *e);
 static void expose(XEvent *e);
+static void floating(void);
 static void focus(Client *c);
 static void focusin(XEvent *e);
 static void focusstack(const Arg *arg);
 static unsigned long getcolor(const char *colstr);
-static Bool getrootptr(int *x, int *y);
 static long getstate(Window w);
 static Bool gettextprop(Window w, Atom atom, char *text, unsigned int size);
 static void grabbuttons(Client *c, Bool focused);
@@ -272,16 +252,22 @@ unsigned long scolors[MAXCOLORS][ColLast];
 /* configuration, allows nested code to access above variables */
 #include "config.h"
 
-struct Pertag {
-   unsigned int curtag, prevtag; /* current and previous tag */
-   int nmasters[LENGTH(tags) + 1]; /* number of windows in master area */
-   float mfacts[LENGTH(tags) + 1]; /* mfacts per tag */
-   unsigned int sellts[LENGTH(tags) + 1]; /* selected layouts */
-   const Layout *ltidxs[LENGTH(tags) + 1][2]; /* matrix of tags and layouts indexes  */
+struct Monitor {
+	char ltsymbol[16];
+	unsigned int lt[LENGTH(tags) + 1];
+	float mfact[LENGTH(tags) + 1];
+	int nmaster[LENGTH(tags) + 1];
+	int by;               /* bar geometry */
+	int mx, my, mw, mh;   /* screen size */
+	int wx, wy, ww, wh;   /* window area  */
+    unsigned int curtag, prevtag;
+	Bool showbar;
+	Bool topbar;
+	Client *clients;
+	Client *sel;
+	Client *stack;
+	Window barwin;
 };
-
-/* compile-time check if all tags fit into an unsigned int bit array. */
-struct NumTags { char limitexceeded[LENGTH(tags) > 31 ? -1 : 1]; };
 
 /* function implementations */
 void
@@ -312,7 +298,7 @@ applyrules(Client *c) {
 	if(ch.res_name)
 		XFree(ch.res_name);
     if (c->tag == 0)
-        c->tag = mons->seltag;
+        c->tag = mons->curtag;
 }
 
 Bool
@@ -346,7 +332,7 @@ applysizehints(Client *c, int *x, int *y, int *w, int *h, Bool interact) {
 		*h = bh;
 	if(*w < bh)
 		*w = bh;
-	if(resizehints || c->isfloating || !mons->lt[mons->sellt]->arrange) {
+	if(resizehints || c->isfloating || curlayout.arrange == floating) {
 		/* see last two sentences in ICCCM 4.1.2.3 */
 		baseismin = c->basew == c->minw && c->baseh == c->minh;
 		if(!baseismin) { /* temporarily remove base dimensions */
@@ -382,13 +368,10 @@ applysizehints(Client *c, int *x, int *y, int *w, int *h, Bool interact) {
 
 void
 arrange(void) {
-	if(mons) {
-		showhide(mons->stack);
-    	strncpy(mons->ltsymbol, mons->lt[mons->sellt]->symbol, sizeof mons->ltsymbol);
-    	if(mons->lt[mons->sellt]->arrange)
-    		mons->lt[mons->sellt]->arrange();
-		restack();
-    }
+	showhide(mons->stack);
+   	strncpy(mons->ltsymbol, curlayout.symbol, sizeof mons->ltsymbol);
+   	curlayout.arrange();
+	restack();
 }
 
 void
@@ -449,11 +432,6 @@ checkotherwm(void) {
 
 void
 cleanup(void) {
-	Arg a = {.ui = ~0};
-	Layout foo = { "", NULL }; /* TODO: wat */
-
-	view(&a);
-	mons->lt[mons->sellt] = &foo;
 	while(mons->stack)
 		unmanage(mons->stack, False);
 	if(dc.font.set)
@@ -500,7 +478,7 @@ clientmessage(XEvent *e) {
 	}
 	else if(cme->message_type == netatom[NetActiveWindow]) {
 		if(!ISVISIBLE(c))
-			mons->seltag = c->tag;
+			mons->curtag = c->tag;
 		pop(c);
 	}
 }
@@ -554,7 +532,7 @@ configurerequest(XEvent *e) {
 	if((c = wintoclient(ev->window))) {
 		if(ev->value_mask & CWBorderWidth)
 			c->bw = ev->border_width;
-		else if(c->isfloating || !mons->lt[mons->sellt]->arrange) {
+		else if(c->isfloating || curlayout.arrange == floating) {
 			if(ev->value_mask & CWX) {
 				c->oldx = c->x;
 				c->x = mons->mx + ev->x;
@@ -603,24 +581,16 @@ createmon(void) {
 
 	if(!(m = (Monitor *)calloc(1, sizeof(Monitor))))
 		die("fatal: could not malloc() %u bytes\n", sizeof(Monitor));
-    if(!(m->pertag = (Pertag *)calloc(1, sizeof(Pertag))))
-       die("fatal: could not malloc() %u bytes\n", sizeof(Pertag));
-	m->seltag = 0;
-	m->mfact = mfact;
-	m->nmaster = nmaster;
+	m->curtag = m->prevtag = 0;
+    /* from config.h */
 	m->showbar = showbar;
 	m->topbar = topbar;
-	m->lt[0] = &layouts[0];
-	m->lt[1] = &layouts[1 % LENGTH(layouts)];
-	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
-    m->pertag->curtag = m->pertag->prevtag = 1;
-    for(i=0; i <= LENGTH(tags); i++) {
-        m->pertag->nmasters[i] = m->nmaster;
-        m->pertag->mfacts[i] = m->mfact;
-        m->pertag->ltidxs[i][0] = m->lt[0];
-        m->pertag->ltidxs[i][1] = m->lt[1];
-        m->pertag->sellts[i] = m->sellt;
+    for(i=0; i < LENGTH(tags); i++) {
+        m->nmaster[i] = nmaster;
+        m->mfact[i] = mfact;
+        m->lt[i] = 0;
     }
+	strncpy(m->ltsymbol, layouts[m->lt[m->curtag]].symbol, sizeof m->ltsymbol);
 	return m;
 }
 
@@ -678,7 +648,7 @@ drawbar(void) {
 	dc.x = 0;
 	for(i = 0; i < LENGTH(tags); i++) {
 		dc.w = TEXTW(tags[i]);
-		col = tcolors[(mons->seltag == i ? 1 : (urg == i ? 2:0))];
+		col = tcolors[(mons->curtag == i ? 1 : (urg == i ? 2:0))];
 		drawtext(tags[i], col, True);
 		drawsquare(mons->sel && mons->sel->tag == i, occ & 1 << i, col);
 		dc.x += dc.w;
@@ -792,6 +762,11 @@ expose(XEvent *e) {
 }
 
 void
+floating(void) {
+    return; /* no behavior */
+}
+
+void
 focus(Client *c) {
 	if(!c || !ISVISIBLE(c))
 		for(c = mons->stack; c && !ISVISIBLE(c); c = c->snext);
@@ -872,15 +847,6 @@ getcolor(const char *colstr) {
 	if(!XAllocNamedColor(dpy, cmap, colstr, &color, &color))
 		die("error, cannot allocate color '%s'\n", colstr);
 	return color.pixel;
-}
-
-Bool
-getrootptr(int *x, int *y) {
-	int di;
-	unsigned int dui;
-	Window dummy;
-
-	return XQueryPointer(dpy, root, &dummy, &dummy, x, y, &di, &di, &dui);
 }
 
 long
@@ -964,7 +930,7 @@ grabkeys(void) {
 
 void
 incnmaster(const Arg *arg) {
-    mons->nmaster = mons->pertag->nmasters[mons->pertag->curtag] = MAX(mons->nmaster + arg->i, 0);
+    mons->nmaster[mons->curtag] = MAX(mons->nmaster[mons->curtag] + arg->i, 0);
 	arrange();
 }
 
@@ -1112,7 +1078,6 @@ void
 monocle(void) {
 	unsigned int n = 0;
 	Client *c;
-
 	for(c = mons->clients; c; c = c->next)
 		if(ISVISIBLE(c))
 			n++;
@@ -1130,7 +1095,7 @@ movemouse(const Arg *arg) {
 
 	if(!(c = mons->sel))
 		return;
-	if(c->isfullscreen) /* no support moving fullscreen windows by mouse */
+	if(c->isfullscreen) /* fullscreen windows can't be moved */
 		return;
 	restack();
 	ocx = c->x;
@@ -1138,8 +1103,11 @@ movemouse(const Arg *arg) {
 	if(XGrabPointer(dpy, root, False, MOUSEMASK, GrabModeAsync, GrabModeAsync,
 	None, cursor[CurMove], CurrentTime) != GrabSuccess)
 		return;
-	if(!getrootptr(&x, &y))
-		return;
+
+    /* dummy values for XQueryPointer call */
+    int di; unsigned int dui; Window dwin;
+	if(!XQueryPointer(dpy, root, &dwin, &dwin, &x, &y, &di, &di, &dui))
+        return;
 	do {
 		XMaskEvent(dpy, MOUSEMASK|ExposureMask|SubstructureRedirectMask, &ev);
 		switch(ev.type) {
@@ -1161,11 +1129,11 @@ movemouse(const Arg *arg) {
 					ny = mons->wy;
 				else if(abs((mons->wy + mons->wh) - (ny + HEIGHT(c))) < snap)
 					ny = mons->wy + mons->wh - HEIGHT(c);
-				if(!c->isfloating && mons->lt[mons->sellt]->arrange
-				&& (abs(nx - c->x) > snap || abs(ny - c->y) > snap))
+				if(!c->isfloating && curlayout.arrange != floating
+                &&(abs(nx - c->x) > snap || abs(ny - c->y) > snap))
 					togglefloating(NULL);
 			}
-			if(!mons->lt[mons->sellt]->arrange || c->isfloating)
+			if(c->isfloating || curlayout.arrange == floating)
 				resize(c, nx, ny, c->w, c->h, True);
 			break;
 		}
@@ -1280,11 +1248,11 @@ resizemouse(const Arg *arg) {
 			if(mons->wx + nw >= mons->wx && mons->wx + nw <= mons->wx + mons->ww
 			&& mons->wy + nh >= mons->wy && mons->wy + nh <= mons->wy + mons->wh)
 			{
-				if(!c->isfloating && mons->lt[mons->sellt]->arrange
-				&& (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
+				if(!c->isfloating && curlayout.arrange != floating
+                && (abs(nw - c->w) > snap || abs(nh - c->h) > snap))
 					togglefloating(NULL);
 			}
-			if(!mons->lt[mons->sellt]->arrange || c->isfloating)
+			if(c->isfloating || curlayout.arrange == floating)
 				resize(c, c->x, c->y, nw, nh, True);
 			break;
 		}
@@ -1303,17 +1271,17 @@ restack(void) {
 	drawbar();
 	if(!mons->sel)
 		return;
-	if(mons->sel->isfloating || !mons->lt[mons->sellt]->arrange)
+	if(mons->sel->isfloating || curlayout.arrange == floating)
 		XRaiseWindow(dpy, mons->sel->win);
-	if(mons->lt[mons->sellt]->arrange) {
-		wc.stack_mode = Below;
-		wc.sibling = mons->barwin;
-		for(c = mons->stack; c; c = c->snext)
-			if(!c->isfloating && ISVISIBLE(c)) {
-				XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
-				wc.sibling = c->win;
-			}
-	}
+    if(curlayout.arrange != floating) {
+    	wc.stack_mode = Below;
+    	wc.sibling = mons->barwin;
+    	for(c = mons->stack; c; c = c->snext)
+    		if(!c->isfloating && ISVISIBLE(c)) {
+    			XConfigureWindow(dpy, c->win, CWSibling|CWStackMode, &wc);
+    			wc.sibling = c->win;
+    		}
+    }
 	XSync(dpy, False);
 	while(XCheckMaskEvent(dpy, EnterWindowMask, &ev));
 }
@@ -1427,33 +1395,23 @@ setfullscreen(Client *c, Bool fullscreen) {
 
 void
 setlayout(const Arg *arg) {
-    if(!arg || !arg->v || arg->v != mons->lt[mons->sellt]) { /* cycle through layouts */
-        mons->pertag->sellts[mons->pertag->curtag] ^= 1;
-        mons->sellt = mons->pertag->sellts[mons->pertag->curtag];
-    }
-    else if(arg && arg->v)
-        mons->pertag->ltidxs[mons->pertag->curtag][mons->sellt] = (Layout *)arg->v;
+    if(arg->i == -1) /* cycle through layouts */
+        mons->lt[mons->curtag] = (mons->lt[mons->curtag] + 1) % LENGTH(layouts);
+    else
+        mons->lt[mons->curtag] = arg->i;
 
-    mons->lt[mons->sellt] = mons->pertag->ltidxs[mons->pertag->curtag][mons->sellt];
-	strncpy(mons->ltsymbol, mons->lt[mons->sellt]->symbol, sizeof mons->ltsymbol);
-
-	if(mons->sel)
-		arrange();
-	else
-		drawbar();
+	strncpy(mons->ltsymbol, curlayout.symbol, sizeof mons->ltsymbol);
+	arrange();
 }
 
-/* arg > 1.0 will set mfact absolutly */
 void
 setmfact(const Arg *arg) {
-	float f;
+    if (curlayout.arrange == floating)
+        return;
 
-	if(!arg || !mons->lt[mons->sellt]->arrange)
-		return;
-	f = arg->f < 1.0 ? arg->f + mons->mfact : arg->f - 1.0;
-	if(f < 0.1 || f > 0.9)
-		return;
-    mons->mfact = mons->pertag->mfacts[mons->pertag->curtag] = f;
+    mons->mfact[mons->curtag] += arg->f;
+    if (mons->mfact[mons->curtag] > 0.9) mons->mfact[mons->curtag] = 0.9;
+    if (mons->mfact[mons->curtag] < 0.1) mons->mfact[mons->curtag] = 0.1;
 	arrange();
 }
 
@@ -1527,7 +1485,7 @@ showhide(Client *c) {
 		return;
 	if(ISVISIBLE(c)) { /* show clients top down */
 		XMoveWindow(dpy, c->win, c->x, c->y);
-		if((!mons->lt[mons->sellt]->arrange || c->isfloating) && !c->isfullscreen)
+		if((curlayout.arrange == floating || c->isfloating) && !c->isfullscreen)
 			resize(c, c->x, c->y, c->w, c->h, False);
 		showhide(c->snext);
 	}
@@ -1559,8 +1517,8 @@ spawn(const Arg *arg) {
 
 void
 tag(const Arg *arg) {
-	if(mons->sel && arg->ui) {
-		mons->sel->tag = arg->ui;
+	if(mons->sel && arg->i < LENGTH(tags)) {
+		mons->sel->tag = arg->i;
 		focus(NULL);
 		arrange();
 	}
@@ -1604,13 +1562,13 @@ tile(void) {
 
 	numgaps = (singlegap && n != 1) ? 1 : 2;
 
-	if(n > mons->nmaster)
-		mw = mons->nmaster ? mons->ww * mons->mfact : 0;
+	if(n > mons->nmaster[mons->curtag])
+		mw = mons->nmaster[mons->curtag] ? mons->ww * mons->mfact[mons->curtag] : 0;
 	else
 		mw = mons->ww;
 	for(i = my = ty = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), i++)
-		if(i < mons->nmaster) {
-			h = (mons->wh - my) / (MIN(n, mons->nmaster) - i);
+		if(i < mons->nmaster[mons->curtag]) {
+			h = (mons->wh - my) / (MIN(n, mons->nmaster[mons->curtag]) - i);
             resize(c, mons->wx, mons->wy + my, mw - numgaps*(c->bw), h - 2*(c->bw), False);
 			my += HEIGHT(c);
 		}
@@ -1633,13 +1591,13 @@ tilegap(void) {
 
 	numgaps = (singlegap && n != 1) ? 1 : 2;
 
-	if(n > mons->nmaster)
-		mw = mons->nmaster ? mons->ww * mons->mfact : 0;
+	if(n > mons->nmaster[mons->curtag])
+		mw = mons->nmaster[mons->curtag] ? mons->ww * mons->mfact[mons->curtag] : 0;
 	else
 		mw = mons->ww;
 	for(i = my = ty = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), i++)
-		if(i < mons->nmaster) {
-			h = (mons->wh - my) / (MIN(n, mons->nmaster) - i);
+		if(i < mons->nmaster[mons->curtag]) {
+			h = (mons->wh - my) / (MIN(n, mons->nmaster[mons->curtag]) - i);
             resize(c, mons->wx + paddingpx, mons->wy + my + paddingpx,
                       mw - numgaps*(c->bw + paddingpx), h - 2*(c->bw + paddingpx), False);
 			my += HEIGHT(c) + paddingpx;
@@ -1889,27 +1847,19 @@ updatewmhints(Client *c) {
 
 void
 view(const Arg *arg) {
-    int i;
     unsigned int tmptag;
-
-	if(arg->ui == mons->seltag)
+	if(arg->i == mons->curtag || arg->i > (int) LENGTH(tags)) {
 		return;
-    if(arg->ui == -1) { /* special case -- view previous tag */
-        tmptag = mons->pertag->prevtag;
-        mons->pertag->prevtag = mons->pertag->curtag;
-        mons->pertag->curtag = tmptag;
+    }
+    if(arg->i == -1) { /* special case -- view previous tag */
+        tmptag = mons->prevtag;
+        mons->prevtag = mons->curtag;
+        mons->curtag = tmptag;
     }
     else {
-        mons->pertag->prevtag = mons->pertag->curtag;
-		mons->seltag = arg->ui;
-        for (i = 0; arg->ui != i; i++) ;
-            mons->pertag->curtag = i + 1;
+        mons->prevtag = mons->curtag;
+		mons->curtag = arg->i;
     }
-    mons->nmaster = mons->pertag->nmasters[mons->pertag->curtag];
-    mons->mfact = mons->pertag->mfacts[mons->pertag->curtag];
-    mons->sellt = mons->pertag->sellts[mons->pertag->curtag];
-    mons->lt[mons->sellt] = mons->pertag->ltidxs[mons->pertag->curtag][mons->sellt];
-    mons->lt[mons->sellt^1] = mons->pertag->ltidxs[mons->pertag->curtag][mons->sellt^1];
 
 	focus(NULL);
 	arrange();
@@ -1962,8 +1912,7 @@ void
 zoom(const Arg *arg) {
 	Client *c = mons->sel;
 
-	if(!mons->lt[mons->sellt]->arrange
-	|| (mons->sel && mons->sel->isfloating))
+	if(curlayout.arrange == floating || (mons->sel && mons->sel->isfloating))
 		return;
 	if(c == nexttiled(mons->clients))
 		if(!c || !(c = nexttiled(c->next)))

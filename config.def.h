@@ -46,15 +46,15 @@ static const Layout layouts[] = {
 	/* symbol     arrange function */
 	{ "[]=",      tile },    /* first entry is default */
 	{ "[]=",      tilegap },
-	{ "><>",      NULL },    /* no layout function means floating behavior */
+	{ "><>",      floating },
 	{ "[M]",      monocle },
 };
 
 /* key definitions */
 #define MODKEY Mod4Mask
 #define TAGKEYS(KEY,TAG) \
-	{ MODKEY,                       KEY,      view,           {.ui = TAG} }, \
-	{ MODKEY|ShiftMask,             KEY,      tag,            {.ui = TAG} }, 
+	{ MODKEY,                       KEY,      view,           {.i = TAG} }, \
+	{ MODKEY|ShiftMask,             KEY,      tag,            {.i = TAG} }, 
 
 /* commands */
 static const char *dmenucmd[] = { "dmenu_run", "-fn", font, "-nb", statuscolors[0][ColBG], "-nf", statuscolors[0][ColFG], "-sb", statuscolors[1][ColBG], "-sf", statuscolors[1][ColFG], NULL };
@@ -71,13 +71,14 @@ static Key keys[] = {
 	{ MODKEY,                       XK_d,      incnmaster,     {.i = -1} },
 	{ MODKEY,                       XK_h,      setmfact,       {.f = -0.05} },
 	{ MODKEY,                       XK_l,      setmfact,       {.f = +0.05} },
-	{ MODKEY,                       XK_Tab,    view,           {.ui = -1} },
+    { MODKEY|ShiftMask,             XK_Return, zoom,           {0} },
+	{ MODKEY,                       XK_Tab,    view,           {.i = -1} },
 	{ MODKEY|ShiftMask,             XK_c,      killclient,     {0} },
-	{ MODKEY,                       XK_t,      setlayout,      {.v = &layouts[0]} },
-	{ MODKEY|ShiftMask,             XK_t,      setlayout,      {.v = &layouts[1]} },
-	{ MODKEY,                       XK_f,      setlayout,      {.v = &layouts[2]} },
-	{ MODKEY,                       XK_m,      setlayout,      {.v = &layouts[3]} },
-	{ MODKEY,                       XK_space,  setlayout,      {0} },
+	{ MODKEY,                       XK_t,      setlayout,      {.i = 0} },
+	{ MODKEY|ShiftMask,             XK_t,      setlayout,      {.i = 1} },
+	{ MODKEY,                       XK_f,      setlayout,      {.i = 2} },
+	{ MODKEY,                       XK_m,      setlayout,      {.i = 3} },
+	{ MODKEY,                       XK_space,  setlayout,      {.i =-1} },
 	{ MODKEY|ShiftMask,             XK_space,  togglefloating, {0} },
 	TAGKEYS(                        XK_1,                      0)
 	TAGKEYS(                        XK_2,                      1)
@@ -95,8 +96,7 @@ static Key keys[] = {
 /* click can be ClkLtSymbol, ClkStatusText, ClkWinTitle, ClkClientWin, or ClkRootWin */
 static Button buttons[] = {
 	/* click                event mask      button          function        argument */
-	{ ClkLtSymbol,          0,              Button1,        setlayout,      {0} },
-	{ ClkLtSymbol,          0,              Button3,        setlayout,      {.v = &layouts[2]} },
+	{ ClkLtSymbol,          0,              Button1,        setlayout,      {.i = -1} },
 	{ ClkWinTitle,          0,              Button2,        zoom,           {0} },
 	{ ClkStatusText,        0,              Button2,        spawn,          {.v = termcmd} },
 	{ ClkClientWin,         MODKEY,         Button1,        movemouse,      {0} },
