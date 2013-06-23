@@ -12,8 +12,7 @@
  *
  * Each child of the root window is called a client, except windows which have
  * set the override_redirect flag.  Clients are organized in a linked client
- * list, and the focus history is remembered through a stack list. Each client 
- * contains a bit array to indicate the tags of a client.
+ * list, and the focus history is remembered through a stack list.
  *
  * Keys and tagging rules are organized as arrays and defined in config.h.
  *
@@ -1376,7 +1375,7 @@ setfullscreen(Client *c, Bool fullscreen) {
 
 void
 setlayout(const Arg *arg) {
-    if(arg->i == -1) /* cycle through layouts */
+    if(arg->i == -1) /* special case -- cycle through layouts */
         mons->lt[mons->curtag] = (mons->lt[mons->curtag] + 1) % LENGTH(layouts);
     else
         mons->lt[mons->curtag] = arg->i;
@@ -1805,10 +1804,6 @@ updatewmhints(Client *c) {
 	XWMHints *wmh;
 
 	if((wmh = XGetWMHints(dpy, c->win))) {
-		if(c == mons->sel && wmh->flags & XUrgencyHint) {
-			wmh->flags &= ~XUrgencyHint;
-			XSetWMHints(dpy, c->win, wmh);
-		}
 		if(wmh->flags & InputHint)
 			c->neverfocus = !wmh->input;
 		else

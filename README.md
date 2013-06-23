@@ -53,6 +53,7 @@ Features removed:
 * Multi-monitor support
 * Multiple tag selection
 * Multiple tags per client
+* Support for urgency hints
 
 Features added:
 * Per-tag layouts, nmaster/mfact values, etc.
