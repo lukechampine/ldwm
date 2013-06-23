@@ -19,15 +19,15 @@
  *
  * To understand everything else, start reading main().
  */
-#include <errno.h>
+//#include <errno.h>
 #include <locale.h>
 #include <stdarg.h>
-#include <signal.h>
+//#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
+//#include <sys/types.h>
 #include <sys/wait.h>
 #include <X11/cursorfont.h>
 #include <X11/keysym.h>
@@ -48,7 +48,6 @@
 #define WIDTH(X)                ((X)->w + 2 * (X)->bw)
 #define HEIGHT(X)               ((X)->h + 2 * (X)->bw)
 #define MAXCOLORS               12
-#define TAGMASK                 ((1 << LENGTH(tags)) - 1)
 #define TEXTW(X)                (textnw(X, strlen(X)) + dc.font.height)
 
 /* enums */
@@ -86,7 +85,7 @@ struct Client {
 	int basew, baseh, incw, inch, maxw, maxh, minw, minh;
 	int bw, oldbw;
     unsigned int tag;
-	Bool isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen;
+	Bool isfixed, isfloating, neverfocus, oldstate, isfullscreen;
 	Client *next;
 	Client *snext;
 	Window win;
@@ -135,7 +134,6 @@ static void attachstack(Client *c);
 static void buttonpress(XEvent *e);
 static void checkotherwm(void);
 static void cleanup(void);
-static void clearurgent(Client *c);
 static void clientmessage(XEvent *e);
 static void configure(Client *c);
 static void configurenotify(XEvent *e);
@@ -205,8 +203,8 @@ static void updateclientlist(void);
 static void updatenumlockmask(void);
 static void updatesizehints(Client *c);
 static void updatestatus(void);
-static void updatewindowtype(Client *c);
 static void updatetitle(Client *c);
+static void updatewindowtype(Client *c);
 static void updatewmhints(Client *c);
 static void view(const Arg *arg);
 static Client *wintoclient(Window w);
@@ -453,18 +451,6 @@ cleanup(void) {
 }
 
 void
-clearurgent(Client *c) {
-	XWMHints *wmh;
-
-	c->isurgent = False;
-	if(!(wmh = XGetWMHints(dpy, c->win)))
-		return;
-	wmh->flags &= ~XUrgencyHint;
-	XSetWMHints(dpy, c->win, wmh);
-	XFree(wmh);
-}
-
-void
 clientmessage(XEvent *e) {
 	XClientMessageEvent *cme = &e->xclient;
 	Client *c = wintoclient(cme->window);
@@ -637,18 +623,15 @@ die(const char *errstr, ...) {
 void
 drawbar(void) {
 	int x;
-	unsigned int i, occ = 0, urg = 0;
+	unsigned int i, occ = 0;
 	unsigned long *col;
 	Client *c;
-	for(c = mons->clients; c; c = c->next) {
+	for(c = mons->clients; c; c = c->next)
 		occ |= 1 << c->tag;
-		if(c->isurgent)
-			urg = c->tag;
-	}
 	dc.x = 0;
 	for(i = 0; i < LENGTH(tags); i++) {
 		dc.w = TEXTW(tags[i]);
-		col = tcolors[(mons->curtag == i ? 1 : (urg == i ? 2:0))];
+		col = tcolors[(mons->curtag == i)];
 		drawtext(tags[i], col, True);
 		drawsquare(mons->sel && mons->sel->tag == i, occ & 1 << i, col);
 		dc.x += dc.w;
@@ -774,8 +757,6 @@ focus(Client *c) {
 	if(mons->sel && mons->sel != c)
 		unfocus(mons->sel, False);
 	if(c) {
-		if(c->isurgent)
-			clearurgent(c);
 		detachstack(c);
 		attachstack(c);
 		grabbuttons(c, True);
@@ -1162,7 +1143,7 @@ propertynotify(XEvent *e) {
 	XPropertyEvent *ev = &e->xproperty;
 
 	if((ev->window == root) && (ev->atom == XA_WM_NAME))
-		updatestatus();
+        updatestatus();
 	else if(ev->state == PropertyDelete)
 		return; /* ignore */
 	else if((c = wintoclient(ev->window))) {
@@ -1431,32 +1412,31 @@ setup(void) {
 	bh = dc.h = dc.font.height + 2;
 	updategeom();
 	/* init atoms */
-	wmatom[WMProtocols] = XInternAtom(dpy, "WM_PROTOCOLS", False);
-	wmatom[WMDelete] = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
-	wmatom[WMState] = XInternAtom(dpy, "WM_STATE", False);
-	wmatom[WMTakeFocus] = XInternAtom(dpy, "WM_TAKE_FOCUS", False);
-	netatom[NetActiveWindow] = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
-	netatom[NetSupported] = XInternAtom(dpy, "_NET_SUPPORTED", False);
-	netatom[NetWMName] = XInternAtom(dpy, "_NET_WM_NAME", False);
-	netatom[NetWMState] = XInternAtom(dpy, "_NET_WM_STATE", False);
-	netatom[NetWMFullscreen] = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
-	netatom[NetWMWindowType] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
+	wmatom[WMProtocols]            = XInternAtom(dpy, "WM_PROTOCOLS", False);
+	wmatom[WMDelete]               = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
+	wmatom[WMState]                = XInternAtom(dpy, "WM_STATE", False);
+	wmatom[WMTakeFocus]            = XInternAtom(dpy, "WM_TAKE_FOCUS", False);
+	netatom[NetActiveWindow]       = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
+	netatom[NetSupported]          = XInternAtom(dpy, "_NET_SUPPORTED", False);
+	netatom[NetWMName]             = XInternAtom(dpy, "_NET_WM_NAME", False);
+	netatom[NetWMState]            = XInternAtom(dpy, "_NET_WM_STATE", False);
+	netatom[NetWMFullscreen]       = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
+	netatom[NetWMWindowType]       = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
 	netatom[NetWMWindowTypeDialog] = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE_DIALOG", False);
-	netatom[NetClientList] = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
+	netatom[NetClientList]         = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
 	/* init cursors */
 	cursor[CurNormal] = XCreateFontCursor(dpy, XC_left_ptr);
 	cursor[CurResize] = XCreateFontCursor(dpy, XC_sizing);
 	cursor[CurMove] = XCreateFontCursor(dpy, XC_fleur);
 	/* init appearance */
     for(int i=0; i<2; i++) {
-		bcolors[i] = getcolor( bordercolors[i] );
-
-		tcolors[i][ColFG] = getcolor( tagcolors[i][ColFG] );
-		tcolors[i][ColBG] = getcolor( tagcolors[i][ColBG] );
+		bcolors[i] = getcolor(bordercolors[i]);
+		tcolors[i][ColFG] = getcolor(tagcolors[i][ColFG]);
+		tcolors[i][ColBG] = getcolor(tagcolors[i][ColBG]);
     }
 	for(int i=0; i<NUMCOLORS; i++) {
-		scolors[i][ColFG] = getcolor( statuscolors[i][ColFG] );
-		scolors[i][ColBG] = getcolor( statuscolors[i][ColBG] );
+		scolors[i][ColFG] = getcolor(statuscolors[i][ColFG]);
+		scolors[i][ColBG] = getcolor(statuscolors[i][ColBG]);
 	}
 	dc.drawable = XCreatePixmap(dpy, root, DisplayWidth(dpy, screen), bh, DefaultDepth(dpy, screen));
 	dc.gc = XCreateGC(dpy, root, 0, NULL);
@@ -1465,7 +1445,7 @@ setup(void) {
 		XSetFont(dpy, dc.gc, dc.font.xfont->fid);
 	/* init bars */
 	updatebars();
-	updatestatus();
+    updatestatus();
 	/* EWMH support per view */
 	XChangeProperty(dpy, root, netatom[NetSupported], XA_ATOM, 32,
 			PropModeReplace, (unsigned char *) netatom, NetLast);
@@ -1620,14 +1600,11 @@ togglebar(const Arg *arg) {
 
 void
 togglefloating(const Arg *arg) {
-	if(!mons->sel)
-		return;
-	if(mons->sel->isfullscreen) /* no support for fullscreen windows */
+	if(!mons->sel || mons->sel->isfullscreen) /* no support for fullscreen windows */
 		return;
 	mons->sel->isfloating = !mons->sel->isfloating || mons->sel->isfixed;
 	if(mons->sel->isfloating)
-		resize(mons->sel, mons->sel->x, mons->sel->y,
-		       mons->sel->w, mons->sel->h, False);
+		resize(mons->sel, mons->sel->x, mons->sel->y, mons->sel->w, mons->sel->h, False);
 	arrange();
 }
 
@@ -1716,9 +1693,7 @@ updateclientlist() {
 
 	XDeleteProperty(dpy, root, netatom[NetClientList]);
 		for(c = mons->clients; c; c = c->next)
-			XChangeProperty(dpy, root, netatom[NetClientList],
-			                XA_WINDOW, 32, PropModeAppend,
-			                (unsigned char *) &(c->win), 1);
+			XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend, (unsigned char *) &(c->win), 1);
 }
 
 Bool
@@ -1800,19 +1775,18 @@ updatesizehints(Client *c) {
 	             && c->maxw == c->minw && c->maxh == c->minh);
 }
 
+void updatestatus(void) {
+	if(!gettextprop(root, XA_WM_NAME, stext, sizeof(stext)))
+	    strcpy(stext, "ldwm-"VERSION);
+	drawbar();
+}
+
 void
 updatetitle(Client *c) {
 	if(!gettextprop(c->win, netatom[NetWMName], c->name, sizeof c->name))
 		gettextprop(c->win, XA_WM_NAME, c->name, sizeof c->name);
 	if(c->name[0] == '\0') /* hack to mark broken clients */
 		strcpy(c->name, broken);
-}
-
-void
-updatestatus(void) {
-	if(!gettextprop(root, XA_WM_NAME, stext, sizeof(stext)))
-		strcpy(stext, "ldwm-"VERSION);
-	drawbar();
 }
 
 void
@@ -1835,8 +1809,6 @@ updatewmhints(Client *c) {
 			wmh->flags &= ~XUrgencyHint;
 			XSetWMHints(dpy, c->win, wmh);
 		}
-		else
-			c->isurgent = (wmh->flags & XUrgencyHint) ? True : False;
 		if(wmh->flags & InputHint)
 			c->neverfocus = !wmh->input;
 		else
@@ -1880,7 +1852,7 @@ wintoclient(Window w) {
  * default error handler, which may call exit.  */
 int
 xerror(Display *dpy, XErrorEvent *ee) {
-	if(ee->error_code == BadWindow
+	if (ee->error_code == BadWindow
 	|| (ee->request_code == X_SetInputFocus && ee->error_code == BadMatch)
 	|| (ee->request_code == X_PolyText8 && ee->error_code == BadDrawable)
 	|| (ee->request_code == X_PolyFillRectangle && ee->error_code == BadDrawable)
@@ -1923,7 +1895,7 @@ zoom(const Arg *arg) {
 int
 main(int argc, char *argv[]) {
 	if(argc == 2 && !strcmp("-v", argv[1]))
-		die("ldwm-"VERSION", © 2006-2012 ldwm engineers, see LICENSE for details\n");
+		die("ldwm-"VERSION", © 2006-2013 (l)dwm engineers, see LICENSE for details\n");
 	else if(argc != 1)
 		die("usage: ldwm [-v]\n");
 	if(!setlocale(LC_CTYPE, "") || !XSupportsLocale())
