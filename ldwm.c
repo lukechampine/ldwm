@@ -632,7 +632,7 @@ drawbar(void) {
 		dc.w = TEXTW(tags[i]);
 		col = tcolors[(mons->curtag == i)];
 		drawtext(tags[i], col, True);
-		drawsquare(mons->sel && mons->sel->tag == i, occ & 1 << i, col);
+		drawsquare(mons->sel && mons->sel->tag == i, occ & (1 << i), col);
 		dc.x += dc.w;
 	}
 	dc.w = blw = TEXTW(mons->ltsymbol);
@@ -646,6 +646,7 @@ drawbar(void) {
 		dc.w = mons->ww - x;
 	}
 	drawcoloredtext(stext);
+    /* client titles */
 	if((dc.w = dc.x - x) > bh) {
 		dc.x = x;
 		if(mons->sel) {
@@ -662,22 +663,19 @@ drawbar(void) {
 
 void
 drawcoloredtext(char *text) {
-	char *buf = text, *ptr = buf, c = 1;
+	char *buf = text, *ptr = text;
 	unsigned long *col = scolors[0];
 	int i, ox = dc.x;
 
-	while( *ptr ) {
-		for( i = 0; *ptr < 0 || *ptr > NUMCOLORS; i++, ptr++);
-		if( !*ptr ) break;
-		c=*ptr;
-		*ptr=0;
-		if( i ) {
+	while(*ptr) {
+		for(i = 0; *ptr < 0 || *ptr > NUMCOLORS; i++, ptr++);
+		if(!*ptr) break;
+		if(i) {
 			dc.w = mons->ww - dc.x;
 			drawtext(buf, col, False);
 			dc.x += textnw(buf, i);
         }
-		*ptr = c;
-		col = scolors[ c-1 ];
+		col = scolors[ *ptr-1 ];
 		buf = ++ptr;
 	}
 	drawtext(buf, col, False);
@@ -727,9 +725,8 @@ void
 enternotify(XEvent *e) {
     XCrossingEvent *ev = &e->xcrossing;
     Client *c = wintoclient(ev->window);
-    if((ev->mode != NotifyNormal || ev->detail == NotifyInferior) && ev->window != root)
-        return;
-    else if(!c || c == mons->sel)
+    if (((ev->mode != NotifyNormal || ev->detail == NotifyInferior) && ev->window != root)
+    || (!c || c == mons->sel))
         return;
     else
         focus(c);
@@ -737,9 +734,7 @@ enternotify(XEvent *e) {
 
 void
 expose(XEvent *e) {
-    XExposeEvent *ev = &e->xexpose;
-    
-    if(ev->count == 0)
+    if((&e->xexpose)->count == 0)
         drawbar();
 }
 
@@ -752,12 +747,12 @@ void
 focus(Client *c) {
 	if(!c || !ISVISIBLE(c))
 		for(c = mons->stack; c && !ISVISIBLE(c); c = c->snext);
-	/* was if(selmon->sel) */
 	if(mons->sel && mons->sel != c)
 		unfocus(mons->sel, False);
 	if(c) {
 		detachstack(c);
 		attachstack(c);
+        if(overlap && curlayout.arrange != floating) restack(); //fix highlight on overlapping borders
 		grabbuttons(c, True);
 		XSetWindowBorder(dpy, c->win, bcolors[0]);
 		setfocus(c);
@@ -1532,60 +1527,51 @@ textnw(const char *text, unsigned int len) {
 
 void
 tile(void) {
-	unsigned int i, n, h, mw, my, ty, numgaps;
+	unsigned int i, n, h, mw, my, ty, nm = mons->nmaster[mons->curtag];
 	Client *c;
 
 	for(n = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), n++);
-	if(n == 0)
-		return;
 
-	numgaps = (singlegap && n != 1) ? 1 : 2;
+    mw = (n > nm) ? mons->ww * mons->mfact[mons->curtag] : mons->ww;
+	if (nm == 0) mw = 0;
 
-	if(n > mons->nmaster[mons->curtag])
-		mw = mons->nmaster[mons->curtag] ? mons->ww * mons->mfact[mons->curtag] : 0;
-	else
-		mw = mons->ww;
 	for(i = my = ty = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), i++)
-		if(i < mons->nmaster[mons->curtag]) {
-			h = (mons->wh - my) / (MIN(n, mons->nmaster[mons->curtag]) - i);
-            resize(c, mons->wx, mons->wy + my, mw - numgaps*(c->bw), h - 2*(c->bw), False);
-			my += HEIGHT(c);
+		if(i < nm) {
+			h = (mons->wh - my) / (MIN(n, nm) - i);
+            resize(c, mons->wx, mons->wy + my,
+                      mw - (overlap && n > nm ? 1 : 2)*(c->bw), h - 2*(c->bw), False);
+            my += HEIGHT(c) - (overlap)*(c->bw);
 		}
 		else {
 			h = (mons->wh - ty) / (n - i);
 			resize(c, mons->wx + mw, mons->wy + ty,
                       mons->ww - mw - 2*(c->bw), h - 2*(c->bw), False);
-			ty += HEIGHT(c) - (2-numgaps)*(c->bw);
+            ty += HEIGHT(c) - (overlap)*(c->bw);
 		}
 }
 
 void
 tilegap(void) {
-	unsigned int i, n, h, mw, my, ty, numgaps;
+	unsigned int i, n, h, mw, my, ty, nm = mons->nmaster[mons->curtag];
 	Client *c;
 
 	for(n = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), n++);
-	if(n == 0)
-		return;
 
-	numgaps = (singlegap && n != 1) ? 1 : 2;
-
-	if(n > mons->nmaster[mons->curtag])
-		mw = mons->nmaster[mons->curtag] ? mons->ww * mons->mfact[mons->curtag] : 0;
-	else
-		mw = mons->ww;
+    mw = (n > nm) ? mons->ww * mons->mfact[mons->curtag] : mons->ww;
+	if (nm == 0) mw = 0;
+    
 	for(i = my = ty = 0, c = nexttiled(mons->clients); c; c = nexttiled(c->next), i++)
-		if(i < mons->nmaster[mons->curtag]) {
-			h = (mons->wh - my) / (MIN(n, mons->nmaster[mons->curtag]) - i);
-            resize(c, mons->wx + paddingpx, mons->wy + my + paddingpx,
-                      mw - numgaps*(c->bw + paddingpx), h - 2*(c->bw + paddingpx), False);
-			my += HEIGHT(c) + paddingpx;
+		if(i < nm) {
+			h = (mons->wh - my) / (MIN(n, nm) - i);
+            resize(c, mons->wx + paddingpx, mons->wy + my + paddingpx, /* from config.h */
+                      mw - 2*(c->bw) - (overlap && n > nm ? 1 : 2)*paddingpx, h - 2*(c->bw + paddingpx), False);
+            my += HEIGHT(c) + (overlap ? 1 : 2)*paddingpx;
 		}
 		else {
 			h = (mons->wh - ty) / (n - i);
 			resize(c, mons->wx + mw + paddingpx, mons->wy + ty + paddingpx,
                       mons->ww - mw - 2*(c->bw + paddingpx), h - 2*(c->bw + paddingpx), False);
-			ty += HEIGHT(c) + numgaps*paddingpx - (2-numgaps)*(c->bw);
+            ty += HEIGHT(c) + (overlap ? 1 : 2)*paddingpx;
 		}
 }
 
