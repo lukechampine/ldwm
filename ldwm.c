@@ -190,13 +190,11 @@ static void tag(const Arg *arg);
 static int textnw(const char *text, unsigned int len);
 static void tile(void);
 static void tilegap(void);
-static void togglebar(const Arg *arg);
 static void togglefloating(const Arg *arg);
 static void unfocus(Client *c, Bool setfocus);
 static void unmanage(Client *c, Bool destroyed);
 static void unmapnotify(XEvent *e);
 static Bool updategeom(void);
-static void updatebarpos(void);
 static void updatebars(void);
 static void updateclientlist(void);
 static void updatenumlockmask(void);
@@ -258,8 +256,6 @@ struct Monitor {
 	int mx, my, mw, mh;   /* screen size */
 	int wx, wy, ww, wh;   /* window area  */
     unsigned int curtag, prevtag;
-	Bool showbar;
-	Bool topbar;
 	Client *clients;
 	Client *sel;
 	Client *stack;
@@ -568,8 +564,6 @@ createmon(void) {
 		die("fatal: could not malloc() %u bytes\n", sizeof(Monitor));
 	m->curtag = m->prevtag = 0;
     /* from config.h */
-	m->showbar = showbar;
-	m->topbar = topbar;
     for(i=0; i < LENGTH(tags); i++) {
         m->nmaster[i] = nmaster;
         m->mfact[i] = mfact;
@@ -1576,14 +1570,6 @@ tilegap(void) {
 }
 
 void
-togglebar(const Arg *arg) {
-	mons->showbar = !mons->showbar;
-	updatebarpos();
-	XMoveResizeWindow(dpy, mons->barwin, mons->wx, mons->by, mons->ww, bh);
-	arrange();
-}
-
-void
 togglefloating(const Arg *arg) {
 	if(!mons->sel || mons->sel->isfullscreen) /* no support for fullscreen windows */
 		return;
@@ -1660,22 +1646,8 @@ updatebars(void) {
 }
 
 void
-updatebarpos(void) {
-	mons->wy = mons->my;
-	mons->wh = mons->mh;
-	if(mons->showbar) {
-		mons->wh -= bh;
-		mons->by = mons->topbar ? mons->wy : mons->wy + mons->wh;
-		mons->wy = mons->topbar ? mons->wy + bh : mons->wy;
-	}
-	else
-		mons->by = -bh;
-}
-
-void
 updateclientlist() {
 	Client *c;
-
 	XDeleteProperty(dpy, root, netatom[NetClientList]);
 		for(c = mons->clients; c; c = c->next)
 			XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend, (unsigned char *) &(c->win), 1);
@@ -1689,8 +1661,10 @@ updategeom(void) {
 	if(mons->mw != sw || mons->mh != sh) {
 		dirty = True;
 		mons->mw = mons->ww = sw;
-		mons->mh = mons->wh = sh;
-		updatebarpos();
+		mons->mh = sh;
+	    mons->wh = sh - bh;
+        mons->by = mons->my;
+        mons->wy = mons->my + bh;
 	}
 	return dirty;
 }
